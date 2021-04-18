@@ -115,7 +115,6 @@ class client(cmd.Cmd):
         Put a local file to a remote file"""
         # TODO there's a 10,000 character limit for messages on reddit
         args = shlex.split(line)
-        print(args)
         if len(args) != 2:
             print("Exactly 2 arguments are required.")
             return
