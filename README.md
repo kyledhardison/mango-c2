@@ -17,3 +17,6 @@ Run `python3 -m venv env` and then `pip3 install -r requirements.txt` in both `c
 Activate the venv via `source env/bin/activate` in either directory.
 
 Start each service by running `python3 main.py`
+
+### Reddit registration
+Create 2 reddit accounts and register them with a web service with full permissions. Include the application keys inside `settings.ini`, and the refresh key in `config/reddit.token`. Details on this process can be found [here](https://praw.readthedocs.io/en/latest/getting_started/authentication.html).
